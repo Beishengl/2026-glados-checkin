@@ -399,6 +399,31 @@ def pushplus(token, title, content):
         log(f"❌ PushPlus 推送失败: {e}")
         return False
 
+def wxpusher_push(app_token, uids, title, content):
+    """WxPusher 微信推送（原生支持 HTML 排版）"""
+    if not app_token or not uids:
+        return False
+    try:
+        url = "https://wxpusher.zjiecode.com/api/send/message"
+        data = {
+            "appToken": app_token,
+            "content": content,
+            "summary": title,          # 微信卡片上显示的摘要标题
+            "contentType": 2,          # 2 表示 HTML 内容
+            "uids": [uid.strip() for uid in uids.split(',') if uid.strip()]
+        }
+        resp = requests.post(url, json=data, timeout=10)
+        res = resp.json()
+        if res.get('code') == 1000:
+            log("✅ WxPusher 推送成功")
+            return True
+        else:
+            log(f"❌ WxPusher 推送失败: {res.get('msg')}")
+            return False
+    except Exception as e:
+        log(f"❌ WxPusher 推送网络异常: {e}")
+        return False
+
 def telegram_push(token, chat_id, title, content):
     if not token or not chat_id: return
     try:
@@ -553,8 +578,11 @@ def main():
     ptoken = os.environ.get("PUSHPLUS_TOKEN")
     tg_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     tg_chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    wx_token = os.environ.get("WXPUSHER_APP_TOKEN")
+    wx_uids = os.environ.get("WXPUSHER_UIDS")
     
-    if ptoken or (tg_token and tg_chat_id):
+    # 只要配置了其中任意一种推送，就生成内容并发送
+    if ptoken or (tg_token and tg_chat_id) or (wx_token and wx_uids):
         title = f"GLaDOS签到: 成功{success_cnt}/{len(cookies)}"
         content = "".join(results)
         content += f"<br><small>时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</small>"
@@ -563,6 +591,8 @@ def main():
             pushplus(ptoken, title, content)
         if tg_token and tg_chat_id:
             telegram_push(tg_token, tg_chat_id, title, content)
+        if wx_token and wx_uids:
+            wxpusher_push(wx_token, wx_uids, title, content)
 
     return 0 if success_cnt == len(cookies) else 1
 
